@@ -1,9 +1,11 @@
 export interface BaseConfig {
   apiKey: string;
-  contextEnabled: boolean;
+  contextEnabled?: boolean;
+
   maxContextChars?: number;
   minScore?: number;
   filter?: Record<string, unknown>;
+  mode?: 'remote' | 'local';
 }
 
 export interface DefaultConfig extends BaseConfig {
