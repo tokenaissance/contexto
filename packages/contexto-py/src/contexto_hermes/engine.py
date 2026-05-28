@@ -121,6 +121,22 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
             return None
         return cls(config)
 
+    @classmethod
+    def from_env_local(cls) -> "ContextoEngine | None":
+        """Build a ContextoEngine wired to the LocalBackend.
+
+        Returns None when local credentials/config are unusable; the underlying
+        `LocalBackendConfig.from_env` already logged the specific reason.
+        """
+        from .local.backend import LocalBackend
+        from .local.mindmap_types import LocalBackendConfig
+        local_cfg = LocalBackendConfig.from_env()
+        if local_cfg is None:
+            return None
+        engine_cfg = ContextoConfig.local_mode_defaults()
+        backend = LocalBackend(local_cfg)
+        return cls(engine_cfg, backend=backend)
+
     def __init__(self, config: ContextoConfig, backend: Any | None = None) -> None:
         super().__init__()
         self.config = config

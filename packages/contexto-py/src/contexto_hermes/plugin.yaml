@@ -1,11 +1,14 @@
 name: contexto
-description: Contexto context engine — full episodes + mindmap retrieval (remote)
-version: 0.1.0
+description: Contexto context engine — remote (api.getcontexto.com) or local (on-disk mindmap)
+version: 0.2.0
 # Auth and tunables are env-var driven. No YAML config block.
 env_vars:
-  - name: CONTEXTO_API_KEY
-    required: true
-    description: API key from getcontexto.com
+  # Backend selector
+  - name: CONTEXTO_BACKEND
+    default: "remote"
+    description: '"remote" (default) or "local"'
+
+  # Shared (both backends)
   - name: CONTEXTO_ENABLED
     default: "true"
   - name: CONTEXTO_MAX_CONTEXT_CHARS
@@ -18,3 +21,41 @@ env_vars:
     default: "10"
   - name: CONTEXTO_INGEST_TIMEOUT
     default: "30"
+
+  # Remote backend
+  - name: CONTEXTO_API_KEY
+    required: false  # required only when CONTEXTO_BACKEND=remote
+    description: API key from getcontexto.com (remote backend only)
+
+  # Local backend — credentials
+  - name: CONTEXTO_LOCAL_PROVIDER
+    description: '"openai" or "openrouter". Defaults to whichever key is set (openrouter wins if both).'
+  - name: OPENAI_API_KEY
+    description: Used by local backend when CONTEXTO_LOCAL_PROVIDER=openai.
+  - name: OPENROUTER_API_KEY
+    description: Used by local backend when CONTEXTO_LOCAL_PROVIDER=openrouter.
+
+  # Local backend — storage & tunables
+  - name: CONTEXTO_LOCAL_STORAGE_PATH
+    description: 'Mindmap JSON path. Defaults to $HERMES_HOME/data/contexto/mindmap.json (or ~/.hermes/...).'
+  - name: CONTEXTO_LOCAL_EMBED_MODEL
+    description: Override the provider's default embeddings model.
+  - name: CONTEXTO_LOCAL_LLM_MODEL
+    description: Override the provider's default summarization model.
+  - name: CONTEXTO_LOCAL_SUMMARIZE
+    default: "true"
+    description: Set false to skip per-ingest LLM summarization (uses synthetic summary instead).
+  - name: CONTEXTO_LOCAL_SIMILARITY_THRESHOLD
+    default: "0.65"
+  - name: CONTEXTO_LOCAL_MAX_DEPTH
+    default: "4"
+  - name: CONTEXTO_LOCAL_MAX_CHILDREN
+    default: "10"
+  - name: CONTEXTO_LOCAL_REBUILD_INTERVAL
+    default: "50"
+  - name: CONTEXTO_LOCAL_BEAM_WIDTH
+    default: "3"
+  - name: CONTEXTO_LOCAL_EMBED_TIMEOUT
+    default: "30"
+  - name: CONTEXTO_LOCAL_LLM_TIMEOUT
+    default: "60"

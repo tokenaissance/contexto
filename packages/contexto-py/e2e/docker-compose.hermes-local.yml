@@ -1,0 +1,39 @@
+# Compose override that runs hermes-agent with the local contexto backend.
+#
+# Pre-req: build the hermes-agent base image once.
+#   cd ../../../hermes-agent
+#   docker build -t hermes-agent .
+#
+# Then from the contexto-py root:
+#   docker compose -f e2e/docker-compose.hermes-local.yml --env-file e2e/.env up
+#
+# This wires CONTEXTO_BACKEND=local + OPENROUTER_API_KEY into the gateway, so
+# any compress() inside Hermes drives the local mindmap.
+#
+# Note: the bundled `plugins/context_engine/contexto/` lives at
+# `/opt/hermes/plugins/context_engine/contexto` inside the image. The
+# hermes-agent repo already symlinks that path back to this source tree, so a
+# fresh image build picks up v0.2.0 automatically — no bind-mount needed.
+# If you want to iterate on contexto-py without rebuilding hermes-agent, mount
+# the source over the image's copy:
+#
+#       - ../../../contexto/packages/contexto-py/src/contexto_hermes:/opt/hermes/plugins/context_engine/contexto
+#
+services:
+  gateway:
+    image: hermes-agent
+    container_name: hermes-contexto-local
+    restart: "no"
+    network_mode: host
+    volumes:
+      - ${HOME}/.hermes:/opt/data
+    environment:
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+      - CONTEXTO_BACKEND=local
+      - CONTEXTO_LOCAL_PROVIDER=openrouter
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Optional tunables — defaults are sensible.
+      # - CONTEXTO_LOCAL_SIMILARITY_THRESHOLD=0.65
+      # - CONTEXTO_LOCAL_REBUILD_INTERVAL=50
+    command: ["gateway", "run"]

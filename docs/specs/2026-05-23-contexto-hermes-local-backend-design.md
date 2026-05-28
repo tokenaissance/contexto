@@ -23,7 +23,7 @@ The v1 plugin spec ([§2 Out of scope](./2026-05-22-contexto-hermes-plugin-desig
 - AGNES hierarchical clustering via `scipy.cluster.hierarchy.linkage(method='average', metric='cosine')`. Defaults match TS `DEFAULT_CONFIG`: `similarity_threshold=0.65`, `max_depth=4`, `max_children=10`, `rebuild_interval=50`.
 - Beam-search retrieval over the cluster tree (`beam_width=3`).
 - Per-ingest LLM summarization (parity with TS `summarizeEpisode`), opt-out via env var.
-- On-disk JSON state, default `~/.hermes/data/contexto/mindmap.json`.
+- On-disk JSON state, default `$HERMES_HOME/data/contexto/mindmap.json` (Hermes home dir; `~/.hermes` locally, `/opt/data` in container).
 - Local episode-text extractor that reads Hermes' flat `data.messages` payload and produces the same `Q:` / `A:` / `T:`-prefixed text TS produces from its `data.userMessage` / `assistantMessages` / `toolMessages` shape.
 
 ### Out of scope (v1 of the local backend)
@@ -95,9 +95,9 @@ Ten modules under `local/`. Each has one job. All public-boundary errors are cau
 
 Same duck-typed contract as `RemoteBackend`. Mirrors TS `LocalBackend` in `packages/contexto/src/local/backend.ts`.
 
-- `__init__(config: LocalBackendConfig, logger: Logger)` — stores config; lazy `Store.load()` on first ingest/search.
+- `__init__(config: LocalBackendConfig, *, embedder=None, summarizer=None, store=None, embed_transport=None, llm_transport=None)` — stores config; lazy `Store.load()` on first ingest/search. Uses the module-level logger (`plugins.context_engine.contexto`) — matches the Python-idiomatic pattern used by `RemoteBackend`, not the TS `logger: Logger` arg. The keyword-only kwargs are test seams that let unit tests inject fakes or `httpx.MockTransport`; production code constructs with just the config.
 - `ingest(payloads: list[WebhookPayload]) -> bool` — embed + (optionally) summarize + insert. Returns success. Never raises.
-- `search(query: str, max_results: int, filter: dict | None = None, min_score: float | None = None) -> SearchResult | None` — embed query, beam-search tree, score, return top-K. Returns `None` on failure OR when no items survive filtering (matches TS). Never raises.
+- `search(query: str, max_results: int, filter: dict | None = None, min_score: float | None = None) -> SearchResult | None` — embed query, beam-search tree, score, return top-K wrapped as `{"item": ConversationItem-dict, "score": float}` per TS `ScoredQueryResult`. Returns `None` on failure OR when no items survive filtering (matches TS). Never raises.
 
 ### `extractor.py`
 
@@ -157,7 +157,7 @@ Beam search over the cluster tree (port of TS `queryMindmapMultiBranch`):
 4. Apply `filter` (exact-match on `metadata[key]`); score by cosine sim to query.
 5. Sort descending; apply `min_score`; slice to `max_results`.
 
-Returns `ScoredQueryResult(items, paths, …)`. `paths` is `list[list[str]]` of cluster *labels* (not IDs), matching TS.
+Returns `ScoredQueryResult(items, paths, …)`. `paths` is `list[list[str]]` of cluster *labels* (not IDs), matching TS. `items` is `list[{"item": dict, "score": float}]` so callers can rank/threshold downstream; the engine's `_entry_id` and `format_search_results` accept this wrapped shape (and fall back to bare items).
 
 ### `embedder.py` and `summarizer.py`
 
@@ -177,7 +177,7 @@ When `CONTEXTO_LOCAL_SUMMARIZE=false`, `backend.py` calls `summarizer.build_synt
 Plain `@dataclass` types. Module named `mindmap_types.py` to avoid colliding with `contexto_hermes.types`. The on-disk schema in §8 is the source of truth for field semantics; the dataclasses mirror it.
 
 - **`MindmapConfig`** — `similarity_threshold=0.65`, `max_depth=4`, `max_children=10`, `rebuild_interval=50`. Mirrors TS `DEFAULT_CONFIG`.
-- **`LocalBackendConfig`** — `storage_path`, `provider` (`openai` | `openrouter`), `api_key`, `embed_model` (None → provider default), `llm_model` (None → provider default), `summarize=True`, nested `mindmap: MindmapConfig`, `beam_width=3`, `embed_timeout=30.0`, `llm_timeout=60.0`. Classmethod `from_env()` returns `None` on unusable config; rules in §7.
+- **`LocalBackendConfig`** — `storage_path`, `provider` (`openai` | `openrouter`), `api_key`, `embed_base_url`, `llm_base_url`, `embed_model: str | None = None` (None → provider default, resolved by `resolved_embed_model()`), `llm_model: str | None = None` (None → provider default, resolved by `resolved_llm_model()`), `summarize=True`, nested `mindmap: MindmapConfig`, `beam_width=3`, `embed_timeout=30.0`, `llm_timeout=60.0`. Classmethod `from_env()` returns `None` on unusable config; rules in §7.
 - **`EvidenceRef`** — `type` (`episode_ref` | `tool_ref` | `file_ref` | `trace_ref`), `value`.
 - **`EpisodeSummary`** — `summary`, `key_findings: list[str]`, `status` (`complete` | `partial` | `blocked`), `confidence: float`, `evidence_refs: list[EvidenceRef]`, `open_questions: list[str] | None`.
 - **`ConversationItem`** — `id`, `role`, `content`, `embedding: list[float]`, `timestamp: str | None`, `metadata: dict[str, Any]`.
@@ -211,7 +211,7 @@ All env-var driven. Additive to the v1 plugin's `CONTEXTO_*` vars.
 | Env var | Default | Purpose |
 |---|---|---|
 | `CONTEXTO_BACKEND` | `remote` | `remote` or `local` |
-| `CONTEXTO_LOCAL_STORAGE_PATH` | `~/.hermes/data/contexto/mindmap.json` | JSON store path |
+| `CONTEXTO_LOCAL_STORAGE_PATH` | `$HERMES_HOME/data/contexto/mindmap.json` (fallback `~/.hermes/data/contexto/mindmap.json`) | JSON store path |
 | `CONTEXTO_LOCAL_PROVIDER` | `openrouter` if `OPENROUTER_API_KEY` set, else `openai` | Embeddings + LLM provider |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | — | Standard names; matches the selected provider |
 | `CONTEXTO_LOCAL_EMBED_MODEL` | provider-specific (see §5) | Embeddings model override |
@@ -236,14 +236,23 @@ Explicit `CONTEXTO_LOCAL_PROVIDER` wins and requires its matching key. Explicit 
 | `openrouter` | Use `OPENROUTER_API_KEY`. Missing key → `from_env` returns `None` (ERROR log) |
 | any other value | `from_env` returns `None` (ERROR log) |
 
-`CONTEXTO_LOCAL_STORAGE_PATH` should align with Hermes' broader data-dir convention if one exists; the default above is a placeholder pending that check.
+`CONTEXTO_LOCAL_STORAGE_PATH` follows Hermes' data-dir convention: it resolves `$HERMES_HOME` (the Hermes home dir env var; defaults to `~/.hermes`, set to `/opt/data` in the Hermes Docker image) and appends `data/contexto/mindmap.json`. In a Docker container this lands at `/opt/data/data/contexto/mindmap.json`; locally at `~/.hermes/data/contexto/mindmap.json`.
 
 ## 8. Storage format
 
 ```json
 {
   "version": 1,
-  "config_snapshot": { "embed_model": "...", "similarity_threshold": 0.65, "rebuild_interval": 50 },
+  "config_snapshot": {
+    "embed_model": "text-embedding-3-small",
+    "llm_model": "gpt-4o-mini",
+    "provider": "openai",
+    "similarity_threshold": 0.65,
+    "max_depth": 4,
+    "max_children": 10,
+    "rebuild_interval": 50,
+    "beam_width": 3
+  },
   "stats": { "total_items": 42, "total_clusters": 7, "inserts_since_rebuild": 3 },
   "root": {
     "id": "root",
@@ -337,7 +346,7 @@ Located in `contexto-py/tests/local/`.
 4. **Provider API drift.** Both TS and Python implementations call OpenAI/OpenRouter directly. API changes need to be applied in both languages; the small `httpx` surface bounds the blast radius.
 5. **TS↔Python behavioral drift.** No shared algorithm code. scipy's AGNES may differ subtly from TS's `ml-hclust` in tie-breaking and floating-point order. Behavioral fixtures asserting top-K item IDs (not exact scores) are the practical guard.
 6. **`max_children` not enforced.** Matches TS — the value exists in defaults but isn't used as a hard cap in the build/insert paths.
-7. **Storage path convention.** `~/.hermes/data/contexto/mindmap.json` chosen by analogy to OpenClaw's `~/.openclaw/`. Should align with Hermes' real data-dir convention if one exists.
+7. **Storage path convention.** Default resolved from `$HERMES_HOME` (Hermes' standard home-dir env var; defaults `~/.hermes`, `/opt/data` in container). Works without further configuration in both local and Docker contexts.
 
 ## 13. Versioning & compatibility
 
