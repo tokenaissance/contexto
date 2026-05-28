@@ -10,15 +10,13 @@
 # This wires CONTEXTO_BACKEND=local + OPENROUTER_API_KEY into the gateway, so
 # any compress() inside Hermes drives the local mindmap.
 #
-# Note: the bundled `plugins/context_engine/contexto/` lives at
-# `/opt/hermes/plugins/context_engine/contexto` inside the image. The
-# hermes-agent repo already symlinks that path back to this source tree, so a
-# fresh image build picks up v0.2.0 automatically — no bind-mount needed.
-# If you want to iterate on contexto-py without rebuilding hermes-agent, mount
-# the source over the image's copy:
-#
-#       - ../../../contexto/packages/contexto-py/src/contexto_hermes:/opt/hermes/plugins/context_engine/contexto
-#
+# Plugin install (active bind mount below): the bundled
+# `plugins/context_engine/contexto/` in the hermes-agent repo is an absolute
+# symlink into this checkout. Docker's `COPY . .` does NOT follow that to a
+# usable file inside the image — it ends up as a broken symlink pointing at a
+# host path the container can't see. We bind-mount the source directly onto the
+# image's plugin path at runtime so the loader sees the live tree. Read-only
+# because the plugin code should not be mutated from inside the container.
 services:
   gateway:
     image: hermes-agent
@@ -27,6 +25,7 @@ services:
     network_mode: host
     volumes:
       - ${HOME}/.hermes:/opt/data
+      - ../src/contexto_hermes:/opt/hermes/plugins/context_engine/contexto:ro
     environment:
       - HERMES_UID=${HERMES_UID:-10000}
       - HERMES_GID=${HERMES_GID:-10000}

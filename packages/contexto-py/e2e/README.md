@@ -44,9 +44,13 @@ What it verifies:
 
 ## 2. Full Hermes container (integration with the agent)
 
-Runs the real `hermes-agent` gateway with `CONTEXTO_BACKEND=local`. The bundled
-`plugins/context_engine/contexto/` is symlinked to this source tree in the
-hermes-agent repo, so a fresh image build picks up the changes automatically.
+Runs the real `hermes-agent` gateway with `CONTEXTO_BACKEND=local`. The
+hermes-agent repo's `plugins/context_engine/contexto/` is an absolute symlink
+into this source tree, which works for the non-Docker `hermes` CLI but **not**
+inside an image — `docker build`'s `COPY` resolves the symlink to a host path
+the container can't see, leaving a broken link at the plugin slot. The compose
+file works around that by bind-mounting this source onto the plugin path at
+runtime, so the loader always sees the live tree.
 
 ```bash
 # One-time: build the hermes-agent base image (slow — Playwright + npm).
@@ -58,6 +62,10 @@ cd ../contexto/packages/contexto-py
 export HERMES_UID=$(id -u) HERMES_GID=$(id -g)
 docker compose -f e2e/docker-compose.hermes-local.yml --env-file e2e/.env up
 ```
+
+If you'd rather bake the plugin into the image, copy `src/contexto_hermes` to
+`hermes-agent/plugins/context_engine/contexto/` (as a real directory, not a
+symlink) before `docker build`, then drop the bind mount from the compose file.
 
 After driving a chat session that triggers `compress()`, the mindmap lands at:
 

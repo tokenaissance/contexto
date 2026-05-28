@@ -140,11 +140,17 @@ def main() -> int:
         log.error("search returned None")
         return 7
     log.info("search OK in %.2fs, got %d items", t1 - t0, len(result.items))
-    for i, item in enumerate(result.items):
-        log.info("  rank %d: content[:80]=%r", i + 1, item["content"][:80])
+    # SearchResult.items entries are {"item": ConversationItem-dict, "score": float}
+    # per spec §5 (TS ScoredQueryResult parity).
+    for i, entry in enumerate(result.items):
+        item = entry["item"]
+        log.info(
+            "  rank %d: score=%.3f content[:80]=%r",
+            i + 1, entry["score"], item["content"][:80],
+        )
 
     # The kubernetes-shaped items should outrank the restaurant one.
-    top_contents = " ".join(it["content"].lower() for it in result.items[:2])
+    top_contents = " ".join(e["item"]["content"].lower() for e in result.items[:2])
     if "kubernetes" not in top_contents and "kubectl" not in top_contents and "pod" not in top_contents:
         log.warning(
             "kubernetes terms not in top-2 results — embeddings may not be well-aligned. "
