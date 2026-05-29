@@ -1,6 +1,6 @@
 name: contexto
 description: Contexto context engine — remote (api.getcontexto.com) or local (on-disk mindmap)
-version: 0.2.0
+version: 0.1.0
 # Auth and tunables are env-var driven. No YAML config block.
 env_vars:
   # Backend selector

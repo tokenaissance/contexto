@@ -33,7 +33,7 @@ def test_required_env_vars_present() -> None:
 
 
 def test_api_key_not_unconditionally_required() -> None:
-    # As of v0.2.0, CONTEXTO_API_KEY is only needed when CONTEXTO_BACKEND=remote;
+    # As of v0.1.0, CONTEXTO_API_KEY is only needed when CONTEXTO_BACKEND=remote;
     # the local backend uses provider keys. So the manifest must NOT mark it required.
     data = _load()
     api_key_entry = next(ev for ev in data["env_vars"] if ev["name"] == "CONTEXTO_API_KEY")

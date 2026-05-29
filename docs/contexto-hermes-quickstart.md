@@ -2,7 +2,7 @@
 
 Install Contexto as a context engine in [hermes-agent](https://hermes-agent.nousresearch.com) in a few minutes. Two backends to choose from — they install the same way and differ only in env vars.
 
-| | **Remote** *(default)* | **Local** *(v0.2.0+)* |
+| | **Remote** *(default)* | **Local** |
 |---|---|---|
 | Storage | Contexto cloud | On-disk JSON (`$HERMES_HOME/data/contexto/mindmap.json`) |
 | Embeddings + summarization | Contexto-hosted | Your OpenAI **or** OpenRouter key |

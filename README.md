@@ -1,6 +1,6 @@
 <h1 align="center">Contexto</h1>
-<h2 align="center">Keep long-running OpenClaw agents reliable after the context window fills.</h2>
-<p align="center">A drop-in OpenClaw context engine that retrieves old constraints instead of losing them to summaries.</p>
+<h2 align="center">Keep long-running OpenClaw and Hermes agents reliable after the context window fills.</h2>
+<p align="center">A drop-in context engine for OpenClaw and hermes-agent that retrieves old constraints instead of losing them to summaries.</p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  OpenClaw works well until long sessions start compacting away the exact instruction that mattered.<br />
+  OpenClaw and hermes-agent work well until long sessions start compacting away the exact instruction that mattered.<br />
   Contexto is the context engine built for that failure mode.
 </p>
 
@@ -64,7 +64,7 @@ The instruction survives compaction.
 
 ## Why Contexto
 
-Contexto is a context engine for OpenClaw. It is built for the exact moment OpenClaw starts dropping or blurring the context your agent still needs:
+Contexto is a context engine plugin. It runs inside OpenClaw and hermes-agent today, and is built for the exact moment your agent starts dropping or blurring the context it still needs:
 
 - early instructions get compacted away
 - summaries turn into summaries of summaries
@@ -79,11 +79,13 @@ Contexto fixes that by storing full episodes and retrieving only the context tha
 - Stores full episodes instead of collapsing everything into lossy summaries
 - Separates topics with semantic clustering so retrieval stays clean
 - Surfaces explainable paths such as `travel -> Japan -> visa docs`
-- Drops into OpenClaw as one plugin with one config key
+- Drops into OpenClaw or Hermes as one plugin with one config key
 
 ## Quick Start
 
-Built for OpenClaw today. Managed hosting is available, so you do not need to run retrieval infrastructure yourself.
+Built for OpenClaw and Hermes today. Managed hosting is available, so you do not need to run retrieval infrastructure yourself.
+
+### OpenClaw
 
 ```bash
 openclaw plugins install @ekai/contexto
@@ -93,13 +95,36 @@ openclaw config set plugins.entries.contexto.config.apiKey YOUR_KEY
 openclaw gateway restart
 ```
 
+### Hermes
+
+```bash
+pip install contexto-hermes
+contexto-hermes-install            # symlinks the plugin into hermes-agent
+```
+
+Enable it in `~/.hermes/config.yaml`:
+
+```yaml
+context:
+  engine: contexto
+```
+
+Then set the key and run:
+
+```bash
+export CONTEXTO_API_KEY=YOUR_KEY
+hermes gateway run
+```
+
+For a fully local setup — embeddings + summarization against your own OpenAI or OpenRouter key, mindmap on disk — see [docs/contexto-hermes-quickstart.md](docs/contexto-hermes-quickstart.md).
+
 Get an API key at [getcontexto.com](https://getcontexto.com/).
 
 If your agent ever forgets a rule, preference, or prior decision after a long run, this is the switch to try first.
 
 ## Who Should Use This
 
-- OpenClaw users whose sessions run long enough to compact
+- OpenClaw or Hermes users whose sessions run long enough to compact
 - Agents where forgotten constraints are costly
 - Teams that want better reliability without prompt hacks
 - Not for one-shot chats or very short sessions
@@ -171,7 +196,6 @@ interface ContextoBackend {
 - [ ] Horizontal scaling with sub-agent context delegation
 - [ ] Scoped context with access boundaries
 - [ ] Knowledge from external documents
-- [ ] Local backend
 - [ ] Context sharing across agents
 
 ## Community

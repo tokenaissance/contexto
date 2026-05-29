@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contexto-hermes"
-version = "0.2.0"
+version = "0.1.0"
 description = "Contexto context engine plugin for hermes-agent — remote or local mindmap retrieval"
 readme = "README.md"
 license = { text = "MIT" }

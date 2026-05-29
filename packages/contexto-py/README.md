@@ -5,7 +5,7 @@
 Two interchangeable backends:
 
 - **Remote (default)** — ingestion + mindmap retrieval against `api.getcontexto.com`.
-- **Local (v0.2.0+)** — pure-Python pipeline; embeddings + summarization call the user's own OpenAI/OpenRouter key; state lives on disk as a single JSON file.
+- **Local** — pure-Python pipeline; embeddings + summarization call the user's own OpenAI/OpenRouter key; state lives on disk as a single JSON file.
 
 ## Install
 

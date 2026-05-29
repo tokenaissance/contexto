@@ -156,8 +156,7 @@ class SearchResult:
     """Parsed mindmap-search response. Returned by both backends.
 
     `paths` is a list of cluster-label paths (not IDs) leading to each terminal
-    node in beam search. Matches TS `ScoredQueryResult.paths`. (Type changed in
-    v0.2.0 from `list[dict]` to `list[list[str]]` to match the local backend.)
+    node in beam search. Matches TS `ScoredQueryResult.paths`.
     """
 
     items: list[dict[str, Any]] = field(default_factory=list)

@@ -20,7 +20,7 @@ from typing import Any
 from .engine import ContextoEngine
 
 __all__ = ["ContextoEngine", "register", "__compatible_contexto_api__"]
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 
 # Pinned `api.getcontexto.com` schema version compatible with this release.
 # Bumped independently from `@ekai/contexto`'s semver.
