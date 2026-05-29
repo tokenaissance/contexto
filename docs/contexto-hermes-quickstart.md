@@ -85,7 +85,7 @@ The hermes-agent base image needs two adjustments when using the local backend:
      - -c
      - |
        uv pip install --python /opt/hermes/.venv/bin/python numpy scipy \
-         && exec gateway run
+         && exec hermes gateway run
    ```
 
 A ready-to-use compose file is at [`packages/contexto-py/e2e/docker-compose.hermes-local.yml`](../packages/contexto-py/e2e/docker-compose.hermes-local.yml).

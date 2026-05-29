@@ -22,10 +22,13 @@
 # and the local backend can't be constructed without them — the plugin loader
 # logs `No module named 'numpy'` and the gateway silently falls back to the
 # built-in compressor. The `sh -c` command below installs both into the image's
-# venv before launching `gateway run`. `uv pip install` is idempotent, so the
-# step is a fast no-op on restarts. The hermes entrypoint activates
-# /opt/hermes/.venv before exec'ing this command, so `uv` and `gateway` are
-# already on PATH and the install targets the right interpreter.
+# venv before launching `hermes gateway run`. `uv pip install` is idempotent,
+# so the step is a fast no-op on restarts. The hermes entrypoint activates
+# /opt/hermes/.venv before exec'ing this command, so `uv` and `hermes` are on
+# PATH and the install targets the right interpreter. NB: we call `hermes
+# gateway run` (not `gateway run`) because the entrypoint's `gateway` → `hermes
+# gateway` wrap only fires when `gateway` is the first container arg — inside
+# our `sh -c` it isn't, and `gateway` isn't a standalone binary.
 services:
   gateway:
     image: hermes-agent
@@ -49,4 +52,4 @@ services:
       - -c
       - |
         uv pip install --python /opt/hermes/.venv/bin/python numpy scipy \
-          && exec gateway run
+          && exec hermes gateway run
