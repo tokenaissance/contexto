@@ -8,7 +8,6 @@ dendrogram structure (similar to ml-hclust's AGNES output), then cut at
 
 from __future__ import annotations
 
-import itertools
 import logging
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -130,7 +129,9 @@ class Clusterer:
 
     def __init__(self, config: MindmapConfig) -> None:
         self._config = config
-        self._counter = itertools.count(1)
+        # Plain int (not itertools.count) so we can fast-forward past whatever
+        # the loaded state already used — see _seed_counter_from.
+        self._next_id = 1
 
     # ---- public API -------------------------------------------------------
     def add(self, state: StoreState, items: list[ConversationItem]) -> StoreState:
@@ -142,6 +143,12 @@ class Clusterer:
         """
         if not items:
             return state
+
+        # Seed the counter past whatever the loaded tree already used so a new
+        # incremental insert cannot reuse an existing id (e.g. cluster-1 again
+        # after restart). Idempotent: a no-op when we're already ahead.
+        if state.root is not None:
+            self._seed_counter_from(state.root)
 
         cur_total = state.stats.total_items
         new_total = cur_total + len(items)
@@ -403,7 +410,31 @@ class Clusterer:
             break
 
     def _new_id(self) -> str:
-        return f"cluster-{next(self._counter)}"
+        cid = f"cluster-{self._next_id}"
+        self._next_id += 1
+        return cid
+
+    def _seed_counter_from(self, root: ClusterNode) -> None:
+        """Push `_next_id` past the largest `cluster-N` already in the tree.
+
+        Guards against ID collisions when a persisted state is reloaded and the
+        next operation is an incremental insert (which would otherwise restart
+        the counter at 1 and produce a duplicate id under root).
+        """
+        max_n = 0
+        stack: list[ClusterNode] = [root]
+        while stack:
+            node = stack.pop()
+            if node.id.startswith("cluster-"):
+                try:
+                    n = int(node.id.split("-", 1)[1])
+                except (ValueError, IndexError):
+                    n = 0
+                if n > max_n:
+                    max_n = n
+            stack.extend(node.children)
+        if self._next_id <= max_n:
+            self._next_id = max_n + 1
 
 
 __all__ = ["Clusterer"]

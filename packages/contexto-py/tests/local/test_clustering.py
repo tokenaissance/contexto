@@ -132,3 +132,61 @@ class TestStatsInvariants:
         items = [_item(i, _normalize([1.0, i * 0.01])) for i in range(20)]
         state = clusterer.add(_empty_state(), items)
         assert state.stats.total_clusters >= 1
+
+
+def _collect_cluster_ids(node: ClusterNode) -> list[str]:
+    ids = [node.id]
+    for child in node.children:
+        ids.extend(_collect_cluster_ids(child))
+    return ids
+
+
+class TestClusterIdUniquenessAfterReload:
+    """Reviewer-reproduced scenario: incremental insert against a loaded state
+    must not reuse `cluster-N` ids that already exist in the tree.
+    """
+
+    def test_incremental_insert_after_reload_does_not_collide(self):
+        # Phase 1 — build state with a fresh clusterer; capture the resulting IDs.
+        builder = Clusterer(MindmapConfig(rebuild_interval=1000))
+        seed = [_item(i, _normalize([1.0, i * 0.01])) for i in range(100)]
+        state = builder.add(_empty_state(), seed)
+        first_ids = _collect_cluster_ids(state.root)
+        assert state.root is not None
+        assert len(set(first_ids)) == len(first_ids), "seed build should already be unique"
+
+        # Phase 2 — simulate a process restart: throw away the builder, mint a
+        # FRESH Clusterer (which starts its counter at 1) against the loaded
+        # state. Forced incremental path: new_total >= 100 AND well under
+        # rebuild_interval.
+        reloaded = Clusterer(MindmapConfig(rebuild_interval=1000))
+        # Force the incremental path: new_total stays >= 100 and far under
+        # rebuild_interval.
+        extra = [_item(200 + i, _normalize([0.0, 1.0 + i * 0.01])) for i in range(3)]
+        state = reloaded.add(state, extra)
+
+        all_ids = _collect_cluster_ids(state.root)
+        assert len(set(all_ids)) == len(all_ids), (
+            f"duplicate cluster ids after reload+incremental: {sorted(all_ids)}"
+        )
+        # Specifically: every new id should be strictly larger than every preexisting id.
+        preexisting_max = max(
+            int(cid.split("-", 1)[1]) for cid in first_ids if cid.startswith("cluster-")
+        )
+        new_ids = [cid for cid in all_ids if cid not in set(first_ids) and cid.startswith("cluster-")]
+        for cid in new_ids:
+            assert int(cid.split("-", 1)[1]) > preexisting_max
+
+    def test_seed_counter_idempotent(self):
+        # Two consecutive incremental adds against the same reloaded state
+        # should still produce unique ids (the seed step is idempotent).
+        builder = Clusterer(MindmapConfig(rebuild_interval=1000))
+        state = builder.add(_empty_state(), [
+            _item(i, _normalize([1.0, i * 0.01])) for i in range(100)
+        ])
+
+        reloaded = Clusterer(MindmapConfig(rebuild_interval=1000))
+        state = reloaded.add(state, [_item(200, _normalize([0.0, 1.0]))])
+        state = reloaded.add(state, [_item(201, _normalize([0.0, 1.0]))])
+        ids = _collect_cluster_ids(state.root)
+        assert len(set(ids)) == len(ids)
