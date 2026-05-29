@@ -17,6 +17,15 @@
 # host path the container can't see. We bind-mount the source directly onto the
 # image's plugin path at runtime so the loader sees the live tree. Read-only
 # because the plugin code should not be mutated from inside the container.
+#
+# Runtime deps (numpy + scipy): the hermes-agent base image does not ship them,
+# and the local backend can't be constructed without them — the plugin loader
+# logs `No module named 'numpy'` and the gateway silently falls back to the
+# built-in compressor. The `sh -c` command below installs both into the image's
+# venv before launching `gateway run`. `uv pip install` is idempotent, so the
+# step is a fast no-op on restarts. The hermes entrypoint activates
+# /opt/hermes/.venv before exec'ing this command, so `uv` and `gateway` are
+# already on PATH and the install targets the right interpreter.
 services:
   gateway:
     image: hermes-agent
@@ -35,4 +44,9 @@ services:
       # Optional tunables — defaults are sensible.
       # - CONTEXTO_LOCAL_SIMILARITY_THRESHOLD=0.65
       # - CONTEXTO_LOCAL_REBUILD_INTERVAL=50
-    command: ["gateway", "run"]
+    command:
+      - sh
+      - -c
+      - |
+        uv pip install --python /opt/hermes/.venv/bin/python numpy scipy \
+          && exec gateway run
