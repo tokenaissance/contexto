@@ -4,6 +4,7 @@
 * [Architecture Overview](architecture-overview.md)
 * [Getting Started](getting-started.md)
 * [Contexto Plugin](contexto.md)
+* [Contexto-Hermes Quickstart](contexto-hermes-quickstart.md)
 * [Memory](memory-plugin.md)
 * [Supported Providers and Models](providers-and-models.md)
 * [OpenRouter Integration Quickstart](openrouter-quickstart.md)

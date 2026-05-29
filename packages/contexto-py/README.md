@@ -11,7 +11,7 @@ Two interchangeable backends:
 
 ```bash
 pip install contexto-hermes
-python -m contexto_hermes.install          # symlink into hermes-agent's plugin tree
+contexto-hermes-install                    # symlink into hermes-agent's plugin tree
 ```
 
 Then in `~/.hermes/config.yaml`:
@@ -31,6 +31,8 @@ export CONTEXTO_API_KEY=ckai_xxx
 export CONTEXTO_BACKEND=local
 export OPENROUTER_API_KEY=sk-or-xxx   # or OPENAI_API_KEY=sk-xxx
 ```
+
+For a copy-paste walkthrough with verification + Docker notes, see [`docs/contexto-hermes-quickstart.md`](../../docs/contexto-hermes-quickstart.md).
 
 ## Configuration
 
