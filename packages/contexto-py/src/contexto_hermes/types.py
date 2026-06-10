@@ -124,6 +124,26 @@ class ContextoConfig:
             ingest_timeout=_env_float("CONTEXTO_INGEST_TIMEOUT", default=30.0, minimum=0.0),
         )
 
+    @classmethod
+    def local_mode_defaults(cls) -> "ContextoConfig":
+        """ContextoConfig wired for local mode. CONTEXTO_API_KEY is not used.
+
+        Tunables read CONTEXTO_* env vars where set (so `min_score`,
+        `max_context_chars`, etc. still affect `compress()`).
+        """
+        return cls(
+            api_key="",  # unused; LocalBackend uses provider-specific creds
+            context_enabled=_env_bool("CONTEXTO_ENABLED", default=True),
+            max_context_chars=_env_int("CONTEXTO_MAX_CONTEXT_CHARS", default=2000, minimum=1),
+            # Lower than remote's 0.45: locally one summary spans a whole drop
+            # slice, so query-to-summary cosine for a relevant hit often lands
+            # in the 0.35–0.45 band.
+            min_score=_env_float("CONTEXTO_MIN_SCORE", default=0.35, minimum=0.0, maximum=1.0),
+            max_results=_env_int("CONTEXTO_MAX_RESULTS", default=7, minimum=1),
+            search_timeout=_env_float("CONTEXTO_SEARCH_TIMEOUT", default=10.0, minimum=0.0),
+            ingest_timeout=_env_float("CONTEXTO_INGEST_TIMEOUT", default=30.0, minimum=0.0),
+        )
+
 
 @dataclass
 class ApiError:
@@ -136,7 +156,11 @@ class ApiError:
 
 @dataclass
 class SearchResult:
-    """Parsed /v1/mindmap/search response."""
+    """Parsed mindmap-search response. Returned by both backends.
+
+    `paths` is a list of cluster-label paths (not IDs) leading to each terminal
+    node in beam search. Matches TS `ScoredQueryResult.paths`.
+    """
 
     items: list[dict[str, Any]] = field(default_factory=list)
-    paths: list[dict[str, Any]] = field(default_factory=list)
+    paths: list[list[str]] = field(default_factory=list)
